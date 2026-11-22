@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Despensa POS</title>
+<meta name="theme-color" content="#1f6f5c">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><img src="icons/icon.svg" alt=""><span id="nombre-negocio">Mi Despensa</span></div>
+  <nav>
+    <button data-view="venta" class="active">Venta <kbd>F1</kbd></button>
+    <button data-view="productos">Productos</button>
+    <button data-view="caja">Caja</button>
+    <button data-view="ajustes">Ajustes</button>
+  </nav>
+  <div class="fecha" id="fecha-hoy"></div>
+</header>
+
+<div id="aviso-actualizacion" class="aviso aviso-ok hidden">
+  <span id="aviso-actualizacion-texto"></span>
+  <button id="btn-actualizar-ahora" class="small primary">Reiniciar y actualizar ahora</button>
+</div>
+
+<div id="aviso-backup" class="aviso hidden">
+  Hace más de 7 días que no hacés una copia de seguridad.
+  <button id="btn-aviso-backup" class="small">Hacer copia ahora</button>
+</div>
+
+<main>
+  <!-- VENTA -->
+  <section id="v-venta" class="view active">
+    <div class="venta-grid">
+      <div class="panel">
+        <div id="pestanas" class="pestanas hidden" role="tablist" aria-label="Vendedores"></div>
+        <form id="scan-form" class="scan-form" autocomplete="off">
+          <input id="scan" placeholder="Escaneá el código o escribí el nombre del producto  ·  3* para cantidad" aria-label="Código o nombre">
+          <button type="button" id="btn-camara" class="secondary solo-tablet hidden" title="Escanear con la cámara" aria-label="Escanear con la cámara"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
+          <button type="submit">Agregar</button>
+        </form>
+        <ul id="sugerencias" class="sugerencias hidden" role="listbox"></ul>
+        <div class="tabla-wrap">
+          <table class="carrito">
+            <thead><tr><th>Producto</th><th class="num">Precio</th><th class="num">Cantidad</th><th class="num">Subtotal</th><th></th></tr></thead>
+            <tbody id="carrito-body"></tbody>
+          </table>
+          <div id="carrito-vacio" class="vacio">Escaneá un producto para empezar la venta</div>
+        </div>
+      </div>
+      <aside class="panel cobro-panel">
+        <div class="total-label">TOTAL</div>
+        <div id="total" class="total">$ 0,00</div>
+        <div id="items-count" class="muted">0 artículos</div>
+        <button id="btn-manual" class="secondary">+ Artículo manual <kbd>F3</kbd></button>
+        <button id="btn-cantidad" class="secondary solo-tablet">× Cantidad</button>
+        <button id="btn-cobrar" class="primary big" disabled>Cobrar <kbd>F4</kbd></button>
+        <button id="btn-cancelar" class="ghost">Cancelar venta <kbd>Esc</kbd></button>
+        <div id="ultima-venta" class="ultima hidden"></div>
+        <div class="atajos muted">F2 ir al código · ↑↓ elegir sugerencia<span id="atajo-pestanas" class="hidden"> · F6–F9 cambiar de vendedor</span></div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- PRODUCTOS -->
+  <section id="v-productos" class="view">
+    <div class="toolbar">
+      <input id="prod-buscar" type="search" placeholder="Buscar por nombre o código…">
+      <label class="check"><input type="checkbox" id="prod-sin-precio"> Solo sin precio</label>
+      <button id="btn-nuevo-prod" class="primary">+ Nuevo producto</button>
+      <button id="btn-aumento" class="secondary">Actualizar precios %</button>
+      <span id="sel-info" class="sel-info hidden"></span>
+      <label class="button secondary">Importar CSV<input id="file-csv" type="file" accept=".csv,.txt" hidden></label>
+      <button id="btn-export-prod" class="ghost">Exportar CSV</button>
+    </div>
+    <div class="panel">
+      <table class="lista">
+        <thead><tr><th class="sel"><input type="checkbox" id="sel-todos" aria-label="Seleccionar todos los productos de la lista"></th><th>Código</th><th>Nombre</th><th>Tipo</th><th class="num">Precio</th><th></th></tr></thead>
+        <tbody id="prod-body"></tbody>
+      </table>
+      <div id="prod-info" class="muted pad"></div>
+    </div>
+  </section>
+
+  <!-- CAJA -->
+  <section id="v-caja" class="view">
+    <div class="toolbar">
+      <label>Día <input id="caja-fecha" type="date"></label>
+      <button id="btn-imprimir-caja" class="secondary">Imprimir caja</button>
+      <button id="btn-export-ventas" class="ghost">Exportar CSV</button>
+    </div>
+    <div id="caja-resumen" class="cards"></div>
+    <div class="panel">
+      <table class="lista">
+        <thead><tr><th>N°</th><th>Hora</th><th>Artículos</th><th>Medio</th><th class="num">Total</th><th></th></tr></thead>
+        <tbody id="caja-body"></tbody>
+      </table>
+      <div id="caja-vacio" class="vacio hidden">No hay ventas en este día</div>
+    </div>
+  </section>
+
+  <!-- AJUSTES -->
+  <section id="v-ajustes" class="view">
+    <div class="panel pad ajustes">
+      <h2>Negocio</h2>
+      <label>Nombre del negocio <input id="cfg-negocio"></label>
+      <label class="check"><input type="checkbox" id="cfg-sonido"> Sonido al escanear</label>
+      <label class="check"><input type="checkbox" id="cfg-pedir-cambio"> Preguntar el cambio inicial al empezar el día</label>
+      <label class="check"><input type="checkbox" id="cfg-buscar-online"> Buscar en internet el nombre de los productos nuevos (Open Food Facts)</label>
+      <label>Pantalla táctil (modo tablet)
+        <select id="cfg-tablet">
+          <option value="auto">Automático: se activa solo en tablets y celulares</option>
+          <option value="si">Siempre activado</option>
+          <option value="no">Nunca</option>
+        </select>
+      </label>
+      <button id="btn-guardar-cfg" class="primary">Guardar</button>
+
+      <h2>Vendedores</h2>
+      <p class="muted small">Cada vendedor tiene su pestaña en Venta con su propio carrito. “Invitado” siempre está disponible para que lo use cualquiera.</p>
+      <p class="muted small"><strong>Un lector para cada uno (opcional):</strong> programá cada lector para que agregue una letra antes del código
+        (en su manual: “Prefix” / “Agregar prefijo”), por ejemplo A para Ana y B para Juan, y elegí esa letra al lado de su nombre.
+        Al escanear con su lector, la pantalla pasa a su pestaña.</p>
+      <div id="lectores-com-wrap" class="hidden">
+        <label class="check"><input type="checkbox" id="cfg-lectores-com"> Lectores en modo <strong>USB COM</strong> (para lectores sin prefijo)</label>
+        <p class="muted small">Pasá cada lector a modo COM escaneando “USB COM” en su manual (para volver: “USB”). Después tocá <strong>Asignar lector</strong>
+          al lado de cada nombre y escaneá un producto con su lector. En modo COM el lector solo escribe en Despensa POS.</p>
+        <p class="small" id="lectores-com-estado"></p>
+      </div>
+      <div id="lista-vendedores" class="chips"></div>
+      <div class="row">
+        <label>Nuevo vendedor <input id="nuevo-vendedor" maxlength="20" placeholder="Nombre, ej: Ana"></label>
+        <button id="btn-agregar-vendedor" class="secondary">Agregar</button>
+      </div>
+
+      <h2>Ticket e impresora</h2>
+      <label>Dirección <input id="cfg-direccion" placeholder="Ej: Av. San Martín 1234"></label>
+      <label>Teléfono <input id="cfg-telefono" placeholder="Ej: 11 5555-1234"></label>
+      <label>Mensaje al pie <input id="cfg-pie"></label>
+      <label id="cfg-impresora-wrap" class="hidden">Impresora de tickets
+        <select id="cfg-impresora"><option value="">Predeterminada de Windows</option></select>
+      </label>
+      <div class="row hidden" id="cfg-modo-wrap">
+        <label>Modo de impresión
+          <select id="cfg-modo-impresion">
+            <option value="texto">Texto (impresora térmica, recomendado)</option>
+            <option value="grafico">Gráfico</option>
+          </select>
+        </label>
+        <label>Acentos y ñ
+          <select id="cfg-codepage">
+            <option value="pc850">PC850 (recomendado)</option>
+            <option value="wpc1252">Windows-1252</option>
+            <option value="cp858">CP858</option>
+            <option value="ascii">Sin acentos</option>
+          </select>
+        </label>
+      </div>
+      <div class="row hidden" id="cfg-ajuste-wrap">
+        <label>Caracteres por línea
+          <select id="cfg-columnas">
+            <option value="">Automático según el papel</option>
+            <option value="48">48</option><option value="46">46</option><option value="44">44</option>
+            <option value="42">42</option><option value="40">40</option><option value="38">38</option>
+            <option value="36">36</option><option value="34">34</option><option value="32">32</option>
+          </select>
+        </label>
+        <label>Margen izquierdo
+          <select id="cfg-margen">
+            <option value="0">Sin margen</option>
+            <option value="1">1 espacio</option><option value="2">2 espacios</option><option value="3">3 espacios</option>
+            <option value="4">4 espacios</option><option value="5">5 espacios</option><option value="6">6 espacios</option>
+          </select>
+        </label>
+      </div>
+      <p class="muted small hidden" id="cfg-ajuste-ayuda">Si se cortan las letras de la derecha, bajá los caracteres por línea. Si se cortan las de la izquierda, agregá margen.</p>
+      <div class="row">
+        <label>Imprimir ticket al cobrar
+          <select id="cfg-imprimir">
+            <option value="nunca">Nunca</option>
+            <option value="preguntar">Preguntar en cada venta</option>
+            <option value="siempre">Siempre</option>
+          </select>
+        </label>
+        <label>Ancho del papel
+          <select id="cfg-papel">
+            <option value="80">80 mm</option>
+            <option value="70">70 mm</option>
+            <option value="58">58 mm</option>
+          </select>
+        </label>
+      </div>
+      <div class="ticket-zona">
+        <div class="ticket-acciones">
+          <button id="btn-guardar-cfg2" class="primary">Guardar</button>
+          <button id="btn-ticket-prueba" class="secondary">Imprimir ticket de prueba</button>
+          <p class="muted small">La impresora debe estar instalada en Windows y ser la predeterminada. Ver README → “Impresora de tickets”.</p>
+        </div>
+        <div id="ticket-preview" class="ticket p80" aria-label="Vista previa del ticket"></div>
+      </div>
+
+      <h2>Balanza con etiqueta</h2>
+      <p class="muted small">Para balanzas que imprimen una etiqueta con código de barras que empieza con 2 (Systel, Kretz, Moretti, Dibal…).
+        Cargá cada producto pesable con el mismo número (PLU) que tiene en la balanza como código, por ejemplo <strong>15</strong>.</p>
+      <label class="check"><input type="checkbox" id="cfg-balanza"> Leer etiquetas de balanza</label>
+      <div class="row">
+        <label>Dígitos del PLU
+          <select id="cfg-balanza-plu"><option value="4">4</option><option value="5">5</option><option value="6">6</option></select>
+        </label>
+        <label>La etiqueta trae
+          <select id="cfg-balanza-contenido">
+            <option value="importe">El importe a cobrar</option>
+            <option value="peso">El peso (en gramos)</option>
+          </select>
+        </label>
+      </div>
+      <label class="check" id="cfg-balanza-centavos-wrap"><input type="checkbox" id="cfg-balanza-centavos"> El importe trae centavos (los 2 últimos números)</label>
+      <p class="muted small" id="balanza-ejemplo"></p>
+
+      <h2>Datos</h2>
+      <p class="muted small">Borra toda la lista de productos (por ejemplo, para importar otra). Las ventas y la caja no se tocan.</p>
+      <button id="btn-vaciar-productos" class="ghost peligro">Borrar todos los productos</button>
+
+      <h2>Copia de seguridad</h2>
+      <p class="muted">Guardá una copia en un pendrive o en tu correo al menos una vez por semana. <span id="ultimo-backup"></span></p>
+      <div class="row">
+        <button id="btn-backup" class="secondary">Descargar copia</button>
+        <label class="button ghost">Restaurar copia<input id="file-backup" type="file" accept=".json" hidden></label>
+      </div>
+
+      <div id="seccion-instalacion">
+        <h2>Instalación</h2>
+        <p class="muted" id="install-info">Para instalar: en Chrome o Edge, menú ⋮ → “Instalar Despensa POS”.</p>
+        <button id="btn-instalar" class="secondary hidden">Instalar en esta computadora</button>
+      </div>
+      <p class="muted small" id="version-app"></p>
+    </div>
+  </section>
+</main>
+
+<!-- Diálogo: producto -->
+<dialog id="dlg-producto">
+  <form id="form-producto" autocomplete="off">
+    <h2 id="prod-titulo">Nuevo producto</h2>
+    <label>Código (de barras o interno)
+      <span class="row"><input name="codigo" required><button type="button" id="btn-gen-codigo" class="ghost small">Generar</button></span>
+    </label>
+    <label>Nombre <input name="nombre" required></label>
+    <div class="row">
+      <label>Precio <span id="prod-precio-label">por unidad</span> <input name="precio" inputmode="decimal" required></label>
+      <fieldset class="seg">
+        <legend>Se vende</legend>
+        <label><input type="radio" name="tipo" value="u" checked><span>Por unidad</span></label>
+        <label><input type="radio" name="tipo" value="kg"><span>Por kg</span></label>
+      </fieldset>
+    </div>
+    <p class="muted small" id="prod-online"></p>
+    <p class="error" id="prod-error"></p>
+    <div class="acciones">
+      <button type="button" class="ghost" data-close>Cancelar</button>
+      <button type="submit" class="primary">Guardar</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Diálogo: peso -->
+<dialog id="dlg-peso">
+  <form id="form-peso" autocomplete="off">
+    <h2 id="peso-nombre">Producto</h2>
+    <p class="muted" id="peso-precio"></p>
+    <fieldset class="seg">
+      <label><input type="radio" name="modo" value="peso" checked><span>Peso</span></label>
+      <label><input type="radio" name="modo" value="importe"><span>Importe $</span></label>
+    </fieldset>
+    <input id="peso-input" class="input-grande" inputmode="decimal" placeholder="Ej: 350 (gramos) o 1,2 (kg)" data-teclado>
+    <div class="billetes solo-tablet" id="peso-rapidos">
+      <button type="button" data-gramos="100">100 g</button>
+      <button type="button" data-gramos="250">250 g</button>
+      <button type="button" data-gramos="500">500 g</button>
+      <button type="button" data-gramos="1000">1 kg</button>
+    </div>
+    <p class="muted small" id="peso-ayuda">Enteros desde 10 se toman como gramos (350 = 350 g). Con coma, kilos (1,2 = 1,2 kg). Empezá con $ para importe.</p>
+    <div class="preview" id="peso-preview">—</div>
+    <div class="acciones">
+      <button type="button" class="ghost" data-close>Cancelar</button>
+      <button type="submit" class="primary">Agregar</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Diálogo: artículo manual -->
+<dialog id="dlg-manual">
+  <form id="form-manual" autocomplete="off">
+    <h2>Artículo manual</h2>
+    <label>Descripción <input name="desc" placeholder="Varios"></label>
+    <div class="billetes solo-tablet" id="manual-descs">
+      <button type="button" data-desc="Varios">Varios</button>
+      <button type="button" data-desc="Verdulería">Verdulería</button>
+      <button type="button" data-desc="Panadería">Panadería</button>
+      <button type="button" data-desc="Fiambre">Fiambre</button>
+    </div>
+    <div class="row">
+      <label>Precio <input name="precio" inputmode="decimal" class="input-grande" data-teclado></label>
+      <label>Cantidad <input name="cant" inputmode="decimal" value="1" data-teclado></label>
+    </div>
+    <p class="error" id="manual-error"></p>
+    <div class="acciones">
+      <button type="button" class="ghost" data-close>Cancelar</button>
+      <button type="submit" class="primary">Agregar</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Diálogo: cobro -->
+<dialog id="dlg-cobro">
+  <form id="form-cobro" autocomplete="off">
+    <h2>Cobrar</h2>
+    <div class="cobro-total" id="cobro-total"></div>
+    <fieldset class="medios">
+      <label><input type="radio" name="medio" value="Efectivo" checked><span>Efectivo</span></label>
+      <label><input type="radio" name="medio" value="Débito"><span>Débito</span></label>
+      <label><input type="radio" name="medio" value="Crédito"><span>Crédito</span></label>
+      <label><input type="radio" name="medio" value="Transferencia/QR"><span>Transferencia / QR</span></label>
+    </fieldset>
+    <div id="efectivo-box">
+      <label>Paga con <input id="paga-con" class="input-grande" inputmode="decimal" placeholder="Vacío = pago exacto" data-teclado></label>
+      <div class="billetes" id="billetes"></div>
+      <div class="vuelto">Vuelto: <strong id="vuelto">$ 0,00</strong></div>
+    </div>
+    <p class="error" id="cobro-error"></p>
+    <div class="acciones">
+      <button type="submit" class="primary big">Confirmar <kbd>Enter</kbd></button>
+      <button type="button" class="ghost" data-close>Volver</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Diálogo: escanear con la cámara (Historia 7.2) -->
+<dialog id="dlg-camara">
+  <form method="dialog" onsubmit="return false">
+    <h2>Escanear con la cámara</h2>
+    <div class="camara"><video id="camara-video" playsinline muted></video><div class="camara-mira"></div></div>
+    <p id="camara-estado" class="camara-estado">Apuntá la cámara al código de barras.</p>
+    <div class="acciones"><button type="button" class="primary" data-close>Listo</button></div>
+  </form>
+</dialog>
+
+<!-- Diálogo: confirmación / pregunta (reemplaza confirm/prompt del navegador) -->
+<dialog id="dlg-confirm">
+  <form id="form-confirm" autocomplete="off">
+    <h2 id="confirm-titulo">Confirmar</h2>
+    <p id="confirm-msg" class="confirm-msg"></p>
+    <input id="confirm-input" class="input-grande hidden" inputmode="decimal" data-teclado>
+    <div class="acciones">
+      <button type="button" class="ghost" data-close>Cancelar</button>
+      <button type="submit" class="primary" id="confirm-ok">Aceptar</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlg-venta">
+  <form method="dialog" onsubmit="return false">
+  <h2 id="venta-titulo">Detalle de la venta</h2>
+  <div id="venta-detalle" class="ticket p80 ticket-dialogo"></div>
+  <div class="acciones">
+    <button type="button" class="ghost" data-close>Cerrar</button>
+    <button type="button" class="primary" id="btn-venta-ticket">Imprimir ticket</button>
+  </div>
+  </form>
+</dialog>
+
+<div id="ticket" class="ticket p80" aria-hidden="true"></div>
+
+<div id="toasts" class="toasts" aria-live="polite"></div>
+
+<script src="js/db.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
